@@ -32,7 +32,7 @@ dependencies:
     sdk: flutter
   intl: any
 
-flutter:f
+flutter:
   generate: true # Required for Flutter's internal l10n tool
 ```
 
