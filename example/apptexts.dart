@@ -1,4 +1,4 @@
-class AppTexts {
+abstract final class AppTexts {
   static const String appName = "My Awesome App";
   static const String version = "1.0.3";
 

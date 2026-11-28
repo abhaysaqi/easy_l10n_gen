@@ -2,66 +2,193 @@ import 'dart:io';
 
 import 'package:easy_l10n_gen/easy_l10n_gen.dart';
 
-void main() async {
-  print('🌍 Welcome to easy_l10n_gen - Flutter Localization Generator\n');
+Future<void> main() async {
+  _printHeader();
 
-  /// Ask for language codes
-  print(
-      '📝 Enter language codes (comma-separated) or type "all" for all languages:');
-  print('   Examples: en,es,fr  OR  all');
-  print(
-      '   Available: af, sq, am, ar, hy, as, ay, az, bm, eu, be, bn, bho, bs, bg, ca, ceb, zh-cn, zh-tw, co, hr, cs, da, dv, doi, nl, en, eo, et, ee, fil, fi, fr, fy, gaa, gl, ka, de, el, gn, gu, ht, ha, haw, iw, he, hi, hmn, hu, is, ig, ilo, id, ga, it, ja, jv, kn, kk, km, rw, gom, ko, kri, ku, ckb, ky, lo, la, lv, ln, lt, lg, lb, mk, mai, mg, ms, ml, mt, mi, mr, mni-mtei, lus, mn, my, ne, no, ny, or, om, ps, fa, pl, pt, pa, qu, ro, ru, sm, sa, gd, nso, sr, st, sn, sd, si, sk, sl, so, es, su, sw, sv, tl, tg, ta, tt, te, th, ti, ts, tr, tk, ak, uk, ur, ug, uz, vi, cy, xh, yi, yo, zu');
-  stdout.write('➤ ');
+  final locales = _askForLocales();
 
-  final localesInput = stdin.readLineSync();
-  if (localesInput == null || localesInput.trim().isEmpty) {
-    print('❌ Error: Language codes cannot be empty.');
-    exit(1);
+  if (locales == null) {
+    stderr.writeln('❌ Error: Invalid or empty language selection.');
+    exitCode = 1;
+    return;
   }
 
-  final locales = localesInput.trim().split(',').map((e) => e.trim()).toList();
+  final inputPath = _askForInputPath();
 
-  /// Ask for file path
-  print('\n📂 Enter the path to your Dart file containing strings:');
-  print(
-      '   Examples: lib/constants/app_strings.dart  OR  example/apptexts.dart');
-  stdout.write('➤ ');
-
-  final inputPath = stdin.readLineSync();
-  if (inputPath == null || inputPath.trim().isEmpty) {
-    print('❌ Error: File path cannot be empty.');
-    exit(1);
+  if (inputPath == null) {
+    stderr.writeln('❌ Error: File path cannot be empty or invalid.');
+    exitCode = 1;
+    return;
   }
 
-  print('\n${'=' * 60}');
+  _printSeparator();
   print('🚀 Starting localization generation...');
-  print('${'=' * 60}\n');
+  _printSeparator();
 
   try {
     final generator = L10nGenerator(
-      inputPath: inputPath.trim(),
+      inputPath: inputPath,
       requestedLocales: locales,
     );
 
     await generator.run();
 
     print('\n${'=' * 60}');
-    print('✅ Generation Complete!');
+    print('✅ Localization generation process finished.');
     print('=' * 60);
-    print('\n📦 Files Generated:');
-    print('   • lib/l10n/app_*.arb files (${locales.length} languages)');
-    print('   • lib/l10n/l10n_extension.dart (BuildContext helper)');
-    print('   • l10n.yaml (Flutter l10n configuration)');
+
+    print('\n📦 Expected output files:');
+    print('   • lib/l10n/app_en.arb');
+    print('   • lib/l10n/app_*.arb');
+    print('   • lib/l10n/l10n_extension.dart');
+    print('   • l10n.yaml');
+
     print('\n🎯 Next Steps:');
-    print('   1. Add flutter_localizations to your pubspec.yaml');
-    print('   2. Set "generate: true" under flutter: in pubspec.yaml');
+    print('   1. Add flutter_localizations to pubspec.yaml.');
+    print('   2. Set generate: true under flutter: in pubspec.yaml.');
     print('   3. Run: flutter pub get');
     print('   4. Run: flutter gen-l10n');
-    print('   5. Use in code: context.l10n.yourVariableName');
-    print('\n💡 Tip: Import the extension file to use context.l10n');
-    print('   import \'package:your_app/l10n/l10n_extension.dart\';\n');
-  } catch (e) {
-    print('\n❌ Error: ${e.toString()}');
-    exit(1);
+    print('   5. Use: context.l10n.yourVariableName');
+
+    print('\n💡 Import the extension:');
+    print(
+      "   import 'package:your_app/l10n/l10n_extension.dart';",
+    );
+
+    print('\n⚠️ Review untranslated fallback strings before releasing.');
+  } catch (e, stackTrace) {
+    stderr.writeln('\n❌ Localization generation failed: $e');
+    stderr.writeln(stackTrace);
+    exitCode = 1;
   }
+}
+
+// ------------------------------------------------------------
+// HEADER
+// ------------------------------------------------------------
+
+void _printHeader() {
+  print('\n🌍 Welcome to easy_l10n_gen');
+  print('   Flutter Localization Generator\n');
+}
+
+void _printSeparator() {
+  print('=' * 60);
+}
+
+// ------------------------------------------------------------
+// LOCALE INPUT
+// ------------------------------------------------------------
+
+List<String>? _askForLocales() {
+  print('📝 Enter language codes (comma-separated) or type "all".');
+  print('   Examples: en,es,fr');
+  print('             hi,pa,de');
+  print('             all');
+
+  print('\n   Type "help" to see available language codes.');
+
+  stdout.write('\n➤ ');
+
+  final input = stdin.readLineSync();
+
+  if (input == null || input.trim().isEmpty) {
+    return null;
+  }
+
+  final normalizedInput = input.trim().toLowerCase();
+
+  if (normalizedInput == 'help') {
+    _printAvailableLocales();
+    return _askForLocales();
+  }
+
+  final locales = normalizedInput
+      .split(',')
+      .map((locale) => locale.trim())
+      .where((locale) => locale.isNotEmpty)
+      .toSet()
+      .toList();
+
+  if (locales.isEmpty) {
+    return null;
+  }
+
+  if (locales.contains('all')) {
+    if (locales.length > 1) {
+      stderr.writeln(
+        '⚠️ "all" cannot be combined with individual locale codes.',
+      );
+      return null;
+    }
+
+    return ['all'];
+  }
+
+  final supportedLocales = L10nGenerator.allLocales.toSet();
+
+  final invalidLocales =
+      locales.where((locale) => !supportedLocales.contains(locale)).toList();
+
+  if (invalidLocales.isNotEmpty) {
+    stderr.writeln(
+      '\n❌ Unsupported language codes: ${invalidLocales.join(', ')}',
+    );
+
+    stderr.writeln(
+      '💡 Type "help" to see the supported language codes.',
+    );
+
+    return null;
+  }
+
+  return locales;
+}
+
+void _printAvailableLocales() {
+  print('\n🌐 Supported language codes:\n');
+
+  final locales = L10nGenerator.allLocales;
+
+  for (var i = 0; i < locales.length; i += 10) {
+    final end = (i + 10 < locales.length) ? i + 10 : locales.length;
+
+    print('   ${locales.sublist(i, end).join(', ')}');
+  }
+
+  print('\n   Total: ${locales.length} languages\n');
+}
+
+// ------------------------------------------------------------
+// SOURCE FILE INPUT
+// ------------------------------------------------------------
+
+String? _askForInputPath() {
+  print('\n📂 Enter the path to your Dart file containing strings.');
+  print('   Examples:');
+  print('   lib/constants/app_strings.dart');
+  print('   lib/core/constants/app_strings.dart');
+
+  stdout.write('\n➤ ');
+
+  final input = stdin.readLineSync();
+
+  if (input == null || input.trim().isEmpty) {
+    return null;
+  }
+
+  final path = input.trim();
+  final file = File(path);
+
+  if (!file.existsSync()) {
+    stderr.writeln('\n❌ File not found: $path');
+    return null;
+  }
+
+  if (!path.endsWith('.dart')) {
+    stderr.writeln('\n❌ Please provide a Dart (.dart) file.');
+    return null;
+  }
+
+  return path;
 }
